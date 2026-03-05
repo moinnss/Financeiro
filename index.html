@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <title>Moisés Finance Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Apple HIG Variables */
+        :root {
+            --ios-blue: #0A84FF; --ios-green: #30D158; --ios-red: #FF453A;
+            --bg-color: #F2F2F7; --card-bg: #FFFFFF;
+            --text-main: #000000; --text-muted: #8E8E93;
+            --input-bg: #E5E5EA; --border-color: rgba(60, 60, 67, 0.1);
+            --overlay-bg: rgba(0,0,0,0.3);
+        }
+
+        [data-theme="dark"] {
+            --ios-blue: #0A84FF; --ios-green: #32D74B; --ios-red: #FF453A;
+            --bg-color: #000000; --card-bg: #1C1C1E;
+            --text-main: #FFFFFF; --text-muted: #98989D;
+            --input-bg: #2C2C2E; --border-color: rgba(84, 84, 88, 0.65);
+            --overlay-bg: rgba(0,0,0,0.6);
+        }
+
+        /* Base Typography & Resets */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg-color); color: var(--text-main); 
+            margin: 0; padding: 20px 16px 100px; 
+            overflow-x: hidden; transition: background-color 0.3s ease;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h2, h3 { font-weight: 700; letter-spacing: -0.5px; margin-top: 0; }
+        
+        /* Glassmorphism Lock Screen */
+        #lock-screen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(var(--bg-color), 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            transition: opacity 0.4s ease, visibility 0.4s;
+        }
+        .lock-card { text-align: center; width: 80%; max-width: 300px; }
+
+        /* Sidebar & Overlay */
+        #sidebar { 
+            position: fixed; top: 0; right: -100%; width: 85%; height: 100%; 
+            background: var(--card-bg); z-index: 2000; 
+            box-shadow: -10px 0 30px rgba(0,0,0,0.15); 
+            transition: 0.4s cubic-bezier(0.28, 0.84, 0.42, 1); 
+            padding: 30px 20px 40px; overflow-y: auto; box-sizing: border-box; 
+        }
+        #sidebar.open { right: 0; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--overlay-bg); z-index: 1500; display: none; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fadeIn 0.3s; }
+
+        /* UI Elements - Apple Style Cards */
+        .card { background: var(--card-bg); border-radius: 18px; padding: 20px; margin-bottom: 16px; transition: background-color 0.3s; }
+        .balance-card { background: linear-gradient(135deg, #2c2c2e, #1c1c1e); color: white; border-radius: 22px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+        
+        /* Segmented Control (iOS standard) */
+        .type-selector { display: flex; background: var(--input-bg); border-radius: 9px; padding: 3px; margin-bottom: 16px; }
+        .type-btn { flex: 1; border: none; padding: 8px; border-radius: 7px; font-size: 14px; font-weight: 600; background: transparent; color: var(--text-main); cursor: pointer; transition: 0.2s; }
+        .type-btn.active { background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .type-btn[data-type="ganho"].active { color: var(--ios-green); }
+        .type-btn[data-type="despesa"].active { color: var(--ios-red); }
+        
+        /* Inputs - Clean UI */
+        input, select { 
+            width: 100%; padding: 14px 16px; background: var(--input-bg); color: var(--text-main);
+            border: none; border-radius: 12px; margin-top: 8px; box-sizing: border-box; font-size: 16px; 
+            -webkit-appearance: none; appearance: none; transition: background-color 0.3s;
+        }
+        input:focus, select:focus { outline: 2px solid var(--ios-blue); }
+        input[type="color"] { padding: 4px; height: 48px; }
+        
+        /* Primary Buttons */
+        .btn-save { width: 100%; padding: 16px; background: var(--ios-blue); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; margin-top: 16px; cursor: pointer; transition: opacity 0.2s; }
+        .btn-save:active { opacity: 0.7; }
+        
+        /* Calendar */
+        .cal-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .cal-day { background: var(--input-bg); border-radius: 10px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; transition: background-color 0.3s; }
+        .cal-day.today { background: var(--ios-blue); color: white !important; }
+        .cal-day.today .day-val { color: rgba(255,255,255,0.8) !important; }
+        
+        /* History List */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 0.5px solid var(--border-color); transition: 0.3s; }
+        .list-item:last-child { border-bottom: none; }
+        .list-item.ignored { opacity: 0.3; filter: grayscale(1); }
+        .list-item.ignored .valor-texto { text-decoration: line-through; color: var(--text-muted) !important; }
+        
+        .tag { font-size: 11px; padding: 3px 8px; border-radius: 6px; color: white; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-action { border: none; background: none; font-size: 20px; cursor: pointer; padding: 5px; color: var(--text-muted); transition: color 0.2s; }
+        .btn-action:hover { color: var(--text-main); }
+        .btn-del { color: var(--ios-red); font-size: 24px; font-weight: 300; }
+
+        /* Top Nav */
+        .header-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header-btn { background: var(--input-bg); color: var(--text-main); border: none; width: 40px; height: 40px; border-radius: 20px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="lock-screen">
+        <div class="lock-card">
+            <div style="font-size: 40px; margin-bottom: 10px;">🔒</div>
+            <h2 style="margin-bottom: 5px;">Moisés Finance</h2>
+            <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 20px;">Use o PIN para acessar</p>
+            <input type="password" id="pinInput" placeholder="••••" style="text-align:center; letter-spacing: 8px; font-size: 24px; font-weight: bold; background: var(--input-bg);">
+            <button class="btn-save" onclick="checkPin()">Desbloquear</button>
+        </div>
+    </div>
+
+    <div id="main-content" style="display:none;">
+        <div class="header-main">
+            <h2 style="margin:0;">Visão Geral</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="header-btn" onclick="toggleTheme()" title="Alternar Tema">🌗</button>
+                <button class="header-btn" onclick="toggleSidebar()" title="Menu">⚙️</button>
+            </div>
+        </div>
+
+        <div class="balance-card">
+            <div style="font-size:15px; opacity:0.7; font-weight: 500; margin-bottom: 4px;">Saldo Total</div>
+            <div id="saldoTotal" style="font-size:40px; font-weight:700; letter-spacing: -1px;">R$ 0,00</div>
+        </div>
+
+        <div class="card">
+            <div class="type-selector">
+                <button class="type-btn active" data-type="despesa" onclick="setType('despesa')">Gastos</button>
+                <button class="type-btn" data-type="ganho" onclick="setType('ganho')">Entradas</button>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="valor" placeholder="R$ 0,00" step="0.01">
+                <input type="date" id="data">
+            </div>
+            <select id="cat" onchange="updateSub()"></select>
+            <select id="sub"></select>
+            <button class="btn-save" onclick="salvar()">Salvar Registro</button>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size:16px; margin-bottom: 16px;">Análise do Mês</h3>
+            <div style="height:220px; position: relative;"><canvas id="meuGrafico"></canvas></div>
+        </div>
+
+        <h3 style="font-size:20px; margin: 30px 0 15px;">Transações Recentes</h3>
+        <div class="card" style="padding: 10px 20px;">
+            <div id="listaHistorico"></div>
+        </div>
+    </div>
+
+    <div id="overlay" onclick="toggleSidebar()"></div>
+    <div id="sidebar">
+        <button onclick="toggleSidebar()" style="background:var(--input-bg); color:var(--text-main); border:none; padding:12px; border-radius:12px; width:100%; font-weight:600; font-size:16px; margin-bottom: 20px;">Fechar Menu</button>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <button class="header-btn" onclick="mudarMes(-1)">◀</button>
+                <h3 id="mesTitulo" style="font-size:16px; margin:0; text-transform: capitalize;">Mês</h3>
+                <button class="header-btn" onclick="mudarMes(1)">▶</button>
+            </div>
+            <div id="calendarioGrid" class="cal-container"></div>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size:16px; margin-bottom:10px;">Adicionar Categoria</h3>
+            <input type="text" id="novaCatNome" placeholder="Nome (Ex: Lazer)">
+            <input type="text" id="novaCatSubs" placeholder="Subcategoria (Ex: Cinema)">
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                <span style="font-size: 14px; color: var(--text-muted); white-space: nowrap;">Cor:</span>
+                <input type="color" id="novaCatCor" value="#0A84FF">
+            </div>
+            <button onclick="gerenciarCategoria()" class="btn-save" style="background:var(--text-main); color:var(--card-bg);">Salvar Categoria</button>
+            
+            <hr style="border: 0; border-top: 0.5px solid var(--border-color); margin: 24px 0;">
+            
+            <h3 style="font-size:16px; color:var(--ios-red); margin-bottom:10px;">Apagar Categoria/Sub</h3>
+            <select id="catDelete" onchange="updateSubDel()"></select>
+            <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+                <button onclick="apagarCategoria()" class="btn-save" style="background:var(--input-bg); color:var(--ios-red); margin-top:0; padding:12px; font-size:14px;">Apagar Categoria</button>
+            </div>
+            
+            <select id="subDelete" style="margin-top: 15px;"></select>
+            <button onclick="apagarSubcategoria()" class="btn-save" style="background:var(--input-bg); color:var(--ios-red); margin-top:8px; padding:12px; font-size:14px;">Apagar Subcategoria</button>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size:16px;">Assinaturas</h3>
+            <p style="font-size:13px; color:var(--text-muted); margin-top: 0;">Lançamento automático.</p>
+            <input type="text" id="assNome" placeholder="Serviço (Ex: Spotify)">
+            <input type="number" id="assValor" placeholder="Valor (R$)">
+            <input type="number" id="assDia" placeholder="Dia de cobrança (1-31)">
+            <button onclick="adicionarAssinatura()" class="btn-save">Agendar</button>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size:16px;">Segurança</h3>
+            <input type="password" id="newPin" placeholder="Novo PIN (Mín. 4 dígitos)">
+            <button onclick="setNewPin()" class="btn-save" style="background:var(--text-muted);">Alterar PIN</button>
+        </div>
+    </div>
+
+    <script>
+        let currentType = 'despesa';
+        let dataCalendario = new Date();
+        let meuGrafico;
+
+        // Tema Automático / Salvo
+        function initTheme() {
+            const savedTheme = localStorage.getItem('m_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+        initTheme();
+
+        function toggleTheme() {
+            const body = document.documentElement;
+            const newTheme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('m_theme', newTheme);
+            if(meuGrafico) processarTudo(); // Re-renderiza o gráfico para ajustar cores das fontes
+        }
+
+        const defaultCats = {
+            despesa: {
+                'Alimentação': { subs: ['Mercado', 'iFood'], color: '#FF453A' },
+                'Transporte': { subs: ['Uber', 'Combustível'], color: '#FF9F0A' },
+                'Moradia': { subs: ['Aluguel', 'Contas'], color: '#5E5CE6' }
+            },
+            ganho: { 'Renda': { subs: ['Salário', 'Extras'], color: '#32D74B' } }
+        };
+
+        let categorias = JSON.parse(localStorage.getItem('m_cat_final')) || defaultCats;
+        let transacoes = JSON.parse(localStorage.getItem('m_tra_final')) || [];
+        let assinaturas = JSON.parse(localStorage.getItem('m_ass_final')) || [];
+
+        // --- SEGURANÇA ---
+        function checkPin() {
+            const saved = localStorage.getItem('m_pin') || "1234";
+            if(document.getElementById('pinInput').value === saved) {
+                document.getElementById('lock-screen').style.opacity = "0";
+                document.getElementById('lock-screen').style.visibility = "hidden";
+                document.getElementById('main-content').style.display = "block";
+                inicializar();
+            } else { 
+                alert("PIN Incorreto"); 
+                document.getElementById('pinInput').value = ""; 
+            }
+        }
+
+        function setNewPin() {
+            const p = document.getElementById('newPin').value;
+            if(p.length >= 4) { localStorage.setItem('m_pin', p); alert("PIN Atualizado!"); document.getElementById('newPin').value = ""; }
+            else { alert("O PIN deve ter pelo menos 4 dígitos."); }
+        }
+
+        // --- CORE ---
+        function inicializar() {
+            document.getElementById('data').valueAsDate = new Date();
+            renderCategoriasSelect();
+            processarAssinaturas();
+            processarTudo();
+        }
+
+        function setType(t) {
+            currentType = t;
+            document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === t));
+            renderCategoriasSelect();
+        }
+
+        // --- GERENCIAR CATEGORIAS E SUBCATEGORIAS ---
+        function gerenciarCategoria() {
+            const nome = document.getElementById('novaCatNome').value.trim();
+            const sub = document.getElementById('novaCatSubs').value.trim();
+            const cor = document.getElementById('novaCatCor').value;
+
+            if(!nome) return alert("O nome da categoria é obrigatório.");
+
+            if (!categorias[currentType][nome]) {
+                categorias[currentType][nome] = { subs: sub ? [sub] : [nome], color: cor };
+            } else {
+                if(sub && !categorias[currentType][nome].subs.includes(sub)) categorias[currentType][nome].subs.push(sub);
+                categorias[currentType][nome].color = cor;
+            }
+
+            salvarCategoriasStorage();
+            document.getElementById('novaCatNome').value = "";
+            document.getElementById('novaCatSubs').value = "";
+            alert("Salvo com sucesso!");
+        }
+
+        function apagarCategoria() {
+            const catParaApagar = document.getElementById('catDelete').value;
+            if(!catParaApagar) return;
+            if(confirm(`Tem certeza que deseja apagar a categoria "${catParaApagar}" inteira?`)) {
+                delete categorias[currentType][catParaApagar];
+                salvarCategoriasStorage();
+            }
+        }
+
+        // NOVA FUNÇÃO: Apagar apenas a subcategoria
+        function apagarSubcategoria() {
+            const cat = document.getElementById('catDelete').value;
+            const sub = document.getElementById('subDelete').value;
+            if(!cat || !sub) return;
+            
+            // Impede apagar se for a última subcategoria (uma categoria precisa ter ao menos 1)
+            if(categorias[currentType][cat].subs.length <= 1) {
+                return alert("Não é possível apagar a única subcategoria. Adicione outra antes ou apague a categoria inteira.");
+            }
+
+            if(confirm(`Deseja apagar a subcategoria "${sub}"?`)) {
+                categorias[currentType][cat].subs = categorias[currentType][cat].subs.filter(s => s !== sub);
+                salvarCategoriasStorage();
+            }
+        }
+
+        function salvarCategoriasStorage() {
+            localStorage.setItem('m_cat_final', JSON.stringify(categorias));
+            renderCategoriasSelect();
+        }
+
+        function renderCategoriasSelect() {
+            const htmlOptions = Object.keys(categorias[currentType]).map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            document.getElementById('cat').innerHTML = htmlOptions;
+            document.getElementById('catDelete').innerHTML = htmlOptions;
+            
+            updateSub();
+            updateSubDel();
+        }
+
+        function updateSub() {
+            const c = document.getElementById('cat').value;
+            const subSel = document.getElementById('sub');
+            if(categorias[currentType][c]) {
+                subSel.innerHTML = categorias[currentType][c].subs.map(s => `<option value="${s}">${s}</option>`).join('');
+            } else { subSel.innerHTML = ""; }
+        }
+
+        function updateSubDel() {
+            const c = document.getElementById('catDelete').value;
+            const subDelSel = document.getElementById('subDelete');
+            if(categorias[currentType][c]) {
+                subDelSel.innerHTML = categorias[currentType][c].subs.map(s => `<option value="${s}">${s}</option>`).join('');
+            } else { subDelSel.innerHTML = ""; }
+        }
+
+        // --- ASSINATURAS ---
+        function adicionarAssinatura() {
+            const n = document.getElementById('assNome').value;
+            const v = parseFloat(document.getElementById('assValor').value);
+            const d = parseInt(document.getElementById('assDia').value);
+            if(!n || !v || !d) return alert("Preencha todos os campos.");
+            
+            assinaturas.push({ id: Date.now(), nome: n, valor: v, dia: d, pagaEm: "" });
+            localStorage.setItem('m_ass_final', JSON.stringify(assinaturas));
+            alert("Agendado com sucesso!");
+            processarAssinaturas();
+        }
+
+        function processarAssinaturas() {
+            const hoje = new Date();
+            const refMensal = `${hoje.getFullYear()}-${hoje.getMonth()}`;
+            let mudou = false;
+
+            assinaturas.forEach(as => {
+                if(as.pagaEm !== refMensal && hoje.getDate() >= as.dia) {
+                    const dataFixa = `${hoje.getFullYear()}-${(hoje.getMonth()+1).toString().padStart(2, '0')}-${as.dia.toString().padStart(2, '0')}`;
+                    transacoes.push({ id: Date.now() + Math.random(), tipo: 'despesa', valor: as.valor, data: dataFixa, categoria: 'Moradia', subcategoria: '💎 ' + as.nome, cor: '#5E5CE6', ignorada: false });
+                    as.pagaEm = refMensal;
+                    mudou = true;
+                }
+            });
+
+            if(mudou) {
+                localStorage.setItem('m_tra_final', JSON.stringify(transacoes));
+                localStorage.setItem('m_ass_final', JSON.stringify(assinaturas));
+                processarTudo();
+            }
+        }
+
+        // --- TRANSAÇÕES (CRUD) ---
+        function salvar() {
+            const v = parseFloat(document.getElementById('valor').value);
+            const d = document.getElementById('data').value;
+            const c = document.getElementById('cat').value;
+            const s = document.getElementById('sub').value;
+
+            if(!v || !d) return alert("Valor e data são obrigatórios.");
+
+            transacoes.push({ id: Date.now(), tipo: currentType, valor: v, data: d, categoria: c, subcategoria: s, cor: categorias[currentType][c] ? categorias[currentType][c].color : '#000', ignorada: false });
+            localStorage.setItem('m_tra_final', JSON.stringify(transacoes));
+            document.getElementById('valor').value = "";
+            processarTudo();
+        }
+
+        function excluir(id) {
+            if(confirm("Apagar transação permanentemente?")) {
+                transacoes = transacoes.filter(t => t.id !== id);
+                localStorage.setItem('m_tra_final', JSON.stringify(transacoes));
+                processarTudo();
+            }
+        }
+
+        function alternarIgnorar(id) {
+            const t = transacoes.find(x => x.id === id);
+            if(t) { t.ignorada = !t.ignorada; localStorage.setItem('m_tra_final', JSON.stringify(transacoes)); processarTudo(); }
+        }
+
+        function processarTudo() {
+            let total = 0;
+            const resumo = {}, cores = {}, mesA = new Date().getMonth();
+            transacoes.sort((a,b) => new Date(b.data + "T00:00:00") - new Date(a.data + "T00:00:00"));
+
+            document.getElementById('listaHistorico').innerHTML = transacoes.slice(0, 30).map(t => {
+                if(!t.ignorada) {
+                    total += (t.tipo === 'ganho' ? t.valor : -t.valor);
+                    if(t.tipo === 'despesa' && new Date(t.data + "T00:00:00").getMonth() === mesA) {
+                        resumo[t.categoria] = (resumo[t.categoria] || 0) + t.valor;
+                        cores[t.categoria] = t.cor;
+                    }
+                }
+
+                const classeIgnorada = t.ignorada ? 'ignored' : '';
+                const iconeIgnorar = t.ignorada ? '🙈' : '👁️';
+                const textColor = t.tipo === 'ganho' ? 'var(--ios-green)' : 'var(--text-main)';
+
+                return `
+                <div class="list-item ${classeIgnorada}">
+                    <div>
+                        <span class="tag" style="background:${t.cor}">${t.categoria}</span><br>
+                        <div style="margin-top:4px;">
+                            <b style="font-size:15px; font-weight:600;">${t.subcategoria}</b> 
+                            <span style="color:var(--text-muted); font-size:12px; margin-left:6px;">${t.data.split('-').reverse().join('/')}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center;">
+                        <div class="valor-texto" style="color:${textColor}; font-weight:600; font-size:16px; margin-right:12px;">
+                            ${t.tipo === 'despesa' ? '-' : '+'}R$ ${t.valor.toFixed(2)}
+                        </div>
+                        <button class="btn-action" onclick="alternarIgnorar(${t.id})" title="Ignorar/Considerar">${iconeIgnorar}</button>
+                        <button class="btn-action btn-del" onclick="excluir(${t.id})" title="Apagar">&times;</button>
+                    </div>
+                </div>`;
+            }).join('') || '<p style="text-align:center; color:var(--text-muted); padding:20px;">Nenhuma transação registrada.</p>';
+
+            document.getElementById('saldoTotal').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            renderGrafico(resumo, cores);
+            if(document.getElementById('sidebar').classList.contains('open')) renderCalendario();
+        }
+
+        // --- GRÁFICO & CALENDÁRIO ---
+        function renderGrafico(d, c) {
+            const ctx = document.getElementById('meuGrafico').getContext('2d');
+            if(meuGrafico) meuGrafico.destroy();
+            
+            // Define a cor da fonte com base no tema atual para o Chart.js
+            const fontColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+            Chart.defaults.color = fontColor;
+
+            meuGrafico = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(d), datasets: [{ data: Object.values(d), backgroundColor: Object.values(c), borderWidth: 0 }] },
+                options: { 
+                    maintainAspectRatio: false, 
+                    cutout: '80%', // Borda mais fina estilo Apple Fitness
+                    plugins: { 
+                        legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, padding: 20 } },
+                        tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8 }
+                    } 
+                }
+            });
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').style.display = document.getElementById('sidebar').classList.contains('open') ? 'block' : 'none';
+            if(document.getElementById('sidebar').classList.contains('open')) renderCalendario();
+        }
+
+        function mudarMes(dir) { dataCalendario.setMonth(dataCalendario.getMonth() + dir); renderCalendario(); }
+
+        function renderCalendario() {
+            const grid = document.getElementById('calendarioGrid'); grid.innerHTML = '';
+            const ano = dataCalendario.getFullYear(), mes = dataCalendario.getMonth();
+            const prim = new Date(ano, mes, 1).getDay(), dias = new Date(ano, mes + 1, 0).getDate();
+            document.getElementById('mesTitulo').innerText = `${new Intl.DateTimeFormat('pt-BR', {month:'long'}).format(dataCalendario)} ${ano}`;
+
+            for(let i=0; i<prim; i++) grid.innerHTML += `<div></div>`;
+            for(let i=1; i<=dias; i++) {
+                const dStr = `${ano}-${(mes+1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
+                const tDia = transacoes.filter(t => t.data === dStr && !t.ignorada);
+                let saldo = 0; tDia.forEach(t => saldo += (t.tipo === 'ganho' ? t.valor : -t.valor));
+                const isHoje = (i === new Date().getDate() && mes === new Date().getMonth());
+                
+                grid.innerHTML += `
+                    <div class="cal-day ${isHoje ? 'today' : ''}">
+                        <span style="font-size:12px; font-weight:600">${i}</span>
+                        <span class="day-val" style="font-size:9px; font-weight:700; color:${saldo>=0?'var(--ios-green)':'var(--ios-red)'}; margin-top:2px;">
+                            ${saldo!==0 ? (saldo > 0 ? '+' : '') + saldo.toFixed(0) : ''}
+                        </span>
+                    </div>`;
+            }
+        }
+    </script>
+</body>
+</html>
